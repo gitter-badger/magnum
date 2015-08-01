@@ -66,7 +66,9 @@ struct CubeMapTextureArrayGLTest: AbstractOpenGLTester {
     void compressedSubImageBuffer();
     #ifndef MAGNUM_TARGET_GLES
     void subImageQuery();
+    void compressedSubImageQuery();
     void subImageQueryBuffer();
+    void compressedSubImageQueryBuffer();
     #endif
 
     void generateMipmap();
@@ -103,7 +105,9 @@ CubeMapTextureArrayGLTest::CubeMapTextureArrayGLTest() {
               &CubeMapTextureArrayGLTest::compressedSubImageBuffer,
               #ifndef MAGNUM_TARGET_GLES
               &CubeMapTextureArrayGLTest::subImageQuery,
+              &CubeMapTextureArrayGLTest::compressedSubImageQuery,
               &CubeMapTextureArrayGLTest::subImageQueryBuffer,
+              &CubeMapTextureArrayGLTest::compressedSubImageQueryBuffer,
               #endif
 
               &CubeMapTextureArrayGLTest::generateMipmap,
@@ -760,6 +764,28 @@ void CubeMapTextureArrayGLTest::subImageQuery() {
         Containers::ArrayView<const UnsignedByte>{SubData}, TestSuite::Compare::Container);
 }
 
+void CubeMapTextureArrayGLTest::compressedSubImageQuery() {
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::texture_cube_map_array>())
+        CORRADE_SKIP(Extensions::GL::ARB::texture_cube_map_array::string() + std::string(" is not supported."));
+    if(!Context::current()->isExtensionSupported<Extensions::GL::EXT::texture_compression_s3tc>())
+        CORRADE_SKIP(Extensions::GL::EXT::texture_compression_s3tc::string() + std::string(" is not supported."));
+
+    CubeMapTextureArray texture;
+    texture.setStorage(1, TextureFormat::CompressedRGBAS3tcDxt3, {12, 12, 6})
+        .setCompressedSubImage(0, {}, CompressedImageView3D{CompressedColorFormat::RGBAS3tcDxt3, {12, 12, 6}, CompressedSubDataComplete});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CompressedImage3D image = texture.compressedSubImage(0, Range3Di::fromSize({4, 4, 1}, Vector3i{4}), {});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CORRADE_COMPARE(image.size(), Vector3i{4});
+    CORRADE_COMPARE_AS(
+        (Containers::ArrayView<const UnsignedByte>{image.data<UnsignedByte>(), image.data().size()}),
+        Containers::ArrayView<const UnsignedByte>{CompressedSubData}, TestSuite::Compare::Container);
+}
+
 void CubeMapTextureArrayGLTest::subImageQueryBuffer() {
     if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::texture_cube_map_array>())
         CORRADE_SKIP(Extensions::GL::ARB::texture_cube_map_array::string() + std::string(" is not supported."));
@@ -779,6 +805,27 @@ void CubeMapTextureArrayGLTest::subImageQueryBuffer() {
 
     CORRADE_COMPARE(image.size(), Vector3i(2, 2, 4));
     CORRADE_COMPARE_AS(imageData, Containers::ArrayView<const UnsignedByte>{SubData}, TestSuite::Compare::Container);
+}
+
+void CubeMapTextureArrayGLTest::compressedSubImageQueryBuffer() {
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::texture_cube_map_array>())
+        CORRADE_SKIP(Extensions::GL::ARB::texture_cube_map_array::string() + std::string(" is not supported."));
+    if(!Context::current()->isExtensionSupported<Extensions::GL::EXT::texture_compression_s3tc>())
+        CORRADE_SKIP(Extensions::GL::EXT::texture_compression_s3tc::string() + std::string(" is not supported."));
+
+    CubeMapTextureArray texture;
+    texture.setStorage(1, TextureFormat::CompressedRGBAS3tcDxt3, {12, 12, 6})
+        .setCompressedSubImage(0, {}, CompressedImageView3D{CompressedColorFormat::RGBAS3tcDxt3, {12, 12, 6}, CompressedSubDataComplete});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CompressedBufferImage3D image = texture.compressedSubImage(0, Range3Di::fromSize({4, 4, 1}, Vector3i{4}), {}, BufferUsage::StaticRead);
+    const auto imageData = image.buffer().data<UnsignedByte>();
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CORRADE_COMPARE(image.size(), Vector3i{4});
+    CORRADE_COMPARE_AS(imageData, Containers::ArrayView<const UnsignedByte>{CompressedSubData}, TestSuite::Compare::Container);
 }
 #endif
 

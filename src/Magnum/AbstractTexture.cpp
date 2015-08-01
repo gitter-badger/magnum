@@ -1591,6 +1591,52 @@ template<UnsignedInt dimensions> void AbstractTexture::subImage(const GLint leve
 template void MAGNUM_EXPORT AbstractTexture::subImage<1>(GLint, const Range1Di&, BufferImage<1>&, BufferUsage);
 template void MAGNUM_EXPORT AbstractTexture::subImage<2>(GLint, const Range2Di&, BufferImage<2>&, BufferUsage);
 template void MAGNUM_EXPORT AbstractTexture::subImage<3>(GLint, const Range3Di&, BufferImage<3>&, BufferUsage);
+
+template<UnsignedInt dimensions> std::size_t AbstractTexture::compressedSubImageSize(TextureFormat format, const Math::Vector<dimensions, Int>& size) {
+    /* Amount of blocks in given range (rounded up) multiplied by block
+       data size. The user is responsible for proper block-aligned size. */
+    const Math::Vector<dimensions, Int> blockSize = DataHelper<dimensions>::compressedBlockSize(_target, format);
+    return ((size + blockSize - Math::Vector<dimensions, Int>{1})/blockSize).product()*
+        compressedBlockDataSize(_target, format);
+}
+
+template<UnsignedInt dimensions> void AbstractTexture::compressedSubImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, CompressedImage<dimensions>& image) {
+    createIfNotAlready();
+
+    const Math::Vector<dimensions, Int> size = range.size();
+    const Vector3i paddedOffset = Vector3i::pad(range.min());
+    const Vector3i paddedSize = Vector3i::pad(size, 1);
+    GLint format;
+    (this->*Context::current()->state().texture->getLevelParameterivImplementation)(level, GL_TEXTURE_INTERNAL_FORMAT, &format);
+    Containers::Array<char> data{compressedSubImageSize<dimensions>(TextureFormat(format), size)};
+
+    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
+    glGetCompressedTextureSubImage(_id, level, paddedOffset.x(), paddedOffset.y(), paddedOffset.z(), paddedSize.x(), paddedSize.y(), paddedSize.z(), data.size(), data);
+    image.setData(CompressedColorFormat(format), size, std::move(data));
+}
+
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<1>(GLint, const Range1Di&, CompressedImage<1>&);
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<2>(GLint, const Range2Di&, CompressedImage<2>&);
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<3>(GLint, const Range3Di&, CompressedImage<3>&);
+
+template<UnsignedInt dimensions> void AbstractTexture::compressedSubImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, CompressedBufferImage<dimensions>& image, const BufferUsage usage) {
+    createIfNotAlready();
+
+    const Math::Vector<dimensions, Int> size = range.size();
+    const Vector3i paddedOffset = Vector3i::pad(range.min());
+    const Vector3i paddedSize = Vector3i::pad(size, 1);
+    GLint format;
+    (this->*Context::current()->state().texture->getLevelParameterivImplementation)(level, GL_TEXTURE_INTERNAL_FORMAT, &format);
+    const std::size_t dataSize = compressedSubImageSize<dimensions>(TextureFormat(format), size);
+
+    image.setData(CompressedColorFormat(format), size, {nullptr, std::size_t(dataSize)}, usage);
+    image.buffer().bindInternal(Buffer::TargetHint::PixelPack);
+    glGetCompressedTextureSubImage(_id, level, paddedOffset.x(), paddedOffset.y(), paddedOffset.z(), paddedSize.x(), paddedSize.y(), paddedSize.z(), dataSize, nullptr);
+}
+
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<1>(GLint, const Range1Di&, CompressedBufferImage<1>&, BufferUsage);
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<2>(GLint, const Range2Di&, CompressedBufferImage<2>&, BufferUsage);
+template void MAGNUM_EXPORT AbstractTexture::compressedSubImage<3>(GLint, const Range3Di&, CompressedBufferImage<3>&, BufferUsage);
 #endif
 #endif
 

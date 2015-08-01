@@ -89,7 +89,9 @@ struct CubeMapTextureGLTest: AbstractOpenGLTester {
     #endif
     #ifndef MAGNUM_TARGET_GLES
     void subImageQuery();
+    void compressedSubImageQuery();
     void subImageQueryBuffer();
+    void compressedSubImageQueryBuffer();
     #endif
 
     void generateMipmap();
@@ -146,7 +148,9 @@ CubeMapTextureGLTest::CubeMapTextureGLTest() {
               #endif
               #ifndef MAGNUM_TARGET_GLES
               &CubeMapTextureGLTest::subImageQuery,
+              &CubeMapTextureGLTest::compressedSubImageQuery,
               &CubeMapTextureGLTest::subImageQueryBuffer,
+              &CubeMapTextureGLTest::compressedSubImageQueryBuffer,
               #endif
 
               &CubeMapTextureGLTest::generateMipmap,
@@ -773,6 +777,31 @@ void CubeMapTextureGLTest::subImageQuery() {
         Containers::ArrayView<const UnsignedByte>{Data}, TestSuite::Compare::Container);
 }
 
+void CubeMapTextureGLTest::compressedSubImageQuery() {
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::get_texture_sub_image>())
+        CORRADE_SKIP(Extensions::GL::ARB::get_texture_sub_image::string() + std::string(" is not supported."));
+    /* I'm too lazy to call setSubImage() six times */
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::direct_state_access>())
+        CORRADE_SKIP(Extensions::GL::ARB::direct_state_access::string() + std::string(" is not supported."));
+    if(!Context::current()->isExtensionSupported<Extensions::GL::EXT::texture_compression_s3tc>())
+        CORRADE_SKIP(Extensions::GL::EXT::texture_compression_s3tc::string() + std::string(" is not supported."));
+
+    CubeMapTexture texture;
+    texture.setStorage(1, TextureFormat::CompressedRGBAS3tcDxt3, Vector2i{12})
+        .setCompressedSubImage(0, {}, CompressedImageView3D{CompressedColorFormat::RGBAS3tcDxt3, {12, 12, 1}, CompressedSubDataComplete});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CompressedImage3D image = texture.compressedSubImage(0, Range3Di::fromSize({4, 4, 0}, {4, 4, 1}), {});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CORRADE_COMPARE(image.size(), (Vector3i{4, 4, 1}));
+    CORRADE_COMPARE_AS(
+        (Containers::ArrayView<const UnsignedByte>{image.data<UnsignedByte>(), image.data().size()}),
+        Containers::ArrayView<const UnsignedByte>{CompressedData}, TestSuite::Compare::Container);
+}
+
 void CubeMapTextureGLTest::subImageQueryBuffer() {
     if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::get_texture_sub_image>())
         CORRADE_SKIP(Extensions::GL::ARB::get_texture_sub_image::string() + std::string(" is not supported."));
@@ -793,6 +822,30 @@ void CubeMapTextureGLTest::subImageQueryBuffer() {
 
     CORRADE_COMPARE(image.size(), Vector3i(2, 2, 1));
     CORRADE_COMPARE_AS(imageData, Containers::ArrayView<const UnsignedByte>{Data}, TestSuite::Compare::Container);
+}
+
+void CubeMapTextureGLTest::compressedSubImageQueryBuffer() {
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::get_texture_sub_image>())
+        CORRADE_SKIP(Extensions::GL::ARB::get_texture_sub_image::string() + std::string(" is not supported."));
+    /* I'm too lazy to call setSubImage() six times */
+    if(!Context::current()->isExtensionSupported<Extensions::GL::ARB::direct_state_access>())
+        CORRADE_SKIP(Extensions::GL::ARB::direct_state_access::string() + std::string(" is not supported."));
+    if(!Context::current()->isExtensionSupported<Extensions::GL::EXT::texture_compression_s3tc>())
+        CORRADE_SKIP(Extensions::GL::EXT::texture_compression_s3tc::string() + std::string(" is not supported."));
+
+    CubeMapTexture texture;
+    texture.setStorage(1, TextureFormat::CompressedRGBAS3tcDxt3, Vector2i{12})
+           .setCompressedSubImage(0, {}, CompressedImageView3D{CompressedColorFormat::RGBAS3tcDxt3, {12, 12, 1}, CompressedSubDataComplete});
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CompressedBufferImage3D image = texture.compressedSubImage(0, Range3Di::fromSize({4, 4, 0}, {4, 4, 1}), {}, BufferUsage::StaticRead);
+    const auto imageData = image.buffer().data<UnsignedByte>();
+
+    MAGNUM_VERIFY_NO_ERROR();
+
+    CORRADE_COMPARE(image.size(), (Vector3i{4, 4, 1}));
+    CORRADE_COMPARE_AS(imageData, Containers::ArrayView<const UnsignedByte>{CompressedData}, TestSuite::Compare::Container);
 }
 #endif
 
